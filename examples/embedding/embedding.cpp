@@ -128,6 +128,14 @@ int main(int argc, char ** argv) {
         inputs.push_back(inp);
     }
 
+    for (int j = 0; j < prompts.size(); j++) {
+        printf("embedding %d: ", j);
+        for (auto tok : inputs[j]) {
+            printf("%d, ", tok);
+        }
+        printf("\n");
+    }
+
     // check if the last token is SEP
     // it should be automatically added by the tokenizer when 'tokenizer.ggml.add_eos_token' is set to 'true'
     for (auto & inp : inputs) {
