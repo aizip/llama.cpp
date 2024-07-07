@@ -48,9 +48,18 @@ int main() {
 
         GGML_ASSERT(batch.n_tokens + (int)inp.size() <= n_batch);
 
+        int token_count = 0;
         for (size_t i = 0; i < inp.size(); i++) {
             bool is_last = (i == inp.size() - 1);
-            llama_batch_add(batch, inp[i], i, {0}, is_last);
+            if (inp[i]==1)// This is padding token
+            {
+                llama_batch_add(batch, inp[i], 1, {0}, is_last);
+            }
+            else
+            {
+                llama_batch_add(batch, inp[i], token_count+2, {0}, is_last);
+                token_count++;
+            }
         }
     }
 
@@ -74,16 +83,16 @@ int main() {
 
         fprintf(stdout, "unnormalized embedding:");
         for (int hh = 0; hh < n_embd; hh++) {
-            fprintf(stdout, "%9.6f ", embd[hh]);
+            fprintf(stdout, "%9.6f,", embd[hh]);
         }
         fprintf(stdout, "\n");
 
-        float* out = emb + batch.seq_id[i][0] * n_embd;
-        llama_embd_normalize(embd, out, n_embd);
-        fprintf(stdout, "normalized embedding:");
-        for (int hh = 0; hh < n_embd; hh++) {
-            fprintf(stdout, "%9.6f ", out[hh]);
-        }
-        fprintf(stdout, "\n");
+        // float* out = emb + batch.seq_id[i][0] * n_embd;
+        // llama_embd_normalize(embd, out, n_embd);
+        // fprintf(stdout, "normalized embedding:");
+        // for (int hh = 0; hh < n_embd; hh++) {
+        //     fprintf(stdout, "%9.6f ", out[hh]);
+        // }
+        // fprintf(stdout, "\n");
     }
 }
