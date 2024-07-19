@@ -1,4 +1,6 @@
 # Define the default target now so that it is always the first target
+GGML_NO_LLAMAFILE=1
+LLAMA_NO_OPENMP=1
 BUILD_TARGETS = \
 	libllava.a \
 	llama-baby-llama \
@@ -148,15 +150,18 @@ DEPRECATE_WARNING := 1
 endif
 
 ifndef UNAME_S
-UNAME_S := $(shell uname -s)
+#UNAME_S := $(shell uname -s)
+UNAME_S := Linux
 endif
 
 ifndef UNAME_P
-UNAME_P := $(shell uname -p)
+#UNAME_P := $(shell uname -p)
+UNAME_P := aarch64
 endif
 
 ifndef UNAME_M
-UNAME_M := $(shell uname -m)
+#UNAME_M := $(shell uname -m)
+UNAME_M := aarch64
 endif
 
 # In GNU make default CXX is g++ instead of c++.  Let's fix that so that users
@@ -464,8 +469,8 @@ ifneq ($(filter aarch64%,$(UNAME_M)),)
 	# Apple M1, M2, etc.
 	# Raspberry Pi 3, 4, Zero 2 (64-bit)
 	# Nvidia Jetson
-	MK_CFLAGS   += -mcpu=native
-	MK_CXXFLAGS += -mcpu=native
+	MK_CFLAGS   += -mcpu=cortex-a55
+	MK_CXXFLAGS += -mcpu=cortex-a55
 	JETSON_RELEASE_INFO = $(shell jetson_release)
 	ifdef JETSON_RELEASE_INFO
 		ifneq ($(filter TX2%,$(JETSON_RELEASE_INFO)),)
