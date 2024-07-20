@@ -117,13 +117,15 @@ int main(int argc, char ** argv) {
             const llama_token new_token_id = llama_sample_token_greedy(ctx, &candidates_p);
 
             // is it an end of generation?
-            if (llama_token_is_eog(model, new_token_id) || n_cur == n_predict) {
+            if (llama_token_is_eog(model, new_token_id) || n_cur == n_predict || new_token_id==4710) {
                 LOG_TEE("\n");
 
                 break;
             }
 
             // printf("Print the token\n");
+            // if (new_token_id==4710) break;
+                
             printf("%s", llama_token_to_piece(ctx, new_token_id).c_str());
             fflush(stdout);
 
