@@ -71,7 +71,8 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    printf(" Qurey: %s \n\n\n", params.prompt.c_str());
+    printf("\n");
+    printf(" Query: %s\n", params.prompt.c_str());
 
     // create a llama_batch with size 512
     // we use this object to submit token data for decoding
@@ -97,7 +98,7 @@ int main(int argc, char ** argv) {
     int n_decode = 0;
 
     const auto t_main_start = ggml_time_us();
-
+    printf(" Response: ");
     while (n_decode <= n_predict) {
         // sample the next token
         {
@@ -117,7 +118,7 @@ int main(int argc, char ** argv) {
             const llama_token new_token_id = llama_sample_token_greedy(ctx, &candidates_p);
 
             // is it an end of generation?
-            if (llama_token_is_eog(model, new_token_id) || n_cur == n_predict || new_token_id==4710) {
+            if (llama_token_is_eog(model, new_token_id) || n_cur == n_decode || new_token_id==4710) {
                 LOG_TEE("\n");
 
                 break;
@@ -146,6 +147,7 @@ int main(int argc, char ** argv) {
             return 1;
         }
     }
+    printf("\n");
     printf("\n");
     // LOG_TEE("\n");
 
