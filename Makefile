@@ -7,6 +7,7 @@ BUILD_TARGETS = \
 	llama-bench \
 	llama-benchmark-matmult \
 	llama-cli \
+	llama-cli-test \
 	llama-convert-llama2c-to-ggml \
 	llama-embedding \
 	llama-eval-callback \
@@ -1233,6 +1234,11 @@ llama-cli: examples/main/main.cpp \
 	@echo
 	@echo '====  Run ./llama-cli -h for help.  ===='
 	@echo
+
+llama-cli-test: examples/main_testing/main_test.cpp \
+	$(OBJ_ALL)
+	$(CXX) $(CXXFLAGS) -c $< -o $(call GET_OBJ_FILE, $<)
+	$(CXX) $(CXXFLAGS) $(filter-out %.h $<,$^) $(call GET_OBJ_FILE, $<) -o $@ $(LDFLAGS)
 
 llama-infill: examples/infill/infill.cpp \
 	$(OBJ_ALL)
