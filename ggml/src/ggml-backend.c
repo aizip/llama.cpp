@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -1755,7 +1756,11 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
 
 static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     struct ggml_backend_sched_split * splits = sched->splits;
-
+    if (sched->callback_eval){
+    printf("New Round\n");
+    }
+    int *ptr = (int *)sched->callback_eval_user_data;//{int cur_node = 0,int vec_len,int temp_runtime}
+    ptr[0]=0;
     for (int i = 0; i < sched->n_splits; i++) {
         struct ggml_backend_sched_split * split = &splits[i];
         int split_backend_id = split->backend_id;
@@ -1795,7 +1800,6 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
             // similar to ggml_backend_compare_graph_backend
             for (int j0 = 0; j0 < split->graph.n_nodes; j0++) {
                 struct ggml_tensor * t = split->graph.nodes[j0];
-
                 // check if the user needs data from this node
                 bool need = sched->callback_eval(t, true, sched->callback_eval_user_data);
 
@@ -1808,19 +1812,21 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                 }
 
                 struct ggml_cgraph gv = ggml_graph_view(&split->graph, j0, j1 + 1);
-
+                clock_t start = clock();
                 enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &gv);
                 if (ec != GGML_STATUS_SUCCESS) {
                     return ec;
                 }
+                clock_t end = clock();
+                int elapsed_time_us = ((end - start))  * 1e6 / CLOCKS_PER_SEC;
 
+                ptr[2] =  elapsed_time_us;
                 // TODO: pass backend to the callback, then the user can decide if they want to synchronize
                 ggml_backend_synchronize(split_backend);
-
                 if (need && !sched->callback_eval(t, false, sched->callback_eval_user_data)) {
                     break;
                 }
-
+                // printf(", %d us\n", elapsed_time_us);
                 j0 = j1;
             }
         }
