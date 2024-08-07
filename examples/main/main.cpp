@@ -30,6 +30,71 @@
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
+struct callback_data {
+    int cur_node = 0;
+    int vec_len = 0;
+    int temp_runtime = 0;
+};
+struct node_data{
+    std::string name;
+    std::string op;
+    std::string t1;
+    std::string t2;
+    std::string type;
+    int runtime;
+};
+std::vector<node_data> nodes;
+static bool ggml_debug(struct ggml_tensor * t, bool ask, void * user_data) {
+    auto * cb_data = (callback_data *) user_data;
+
+    const struct ggml_tensor * src0 = t->src[0];
+    const struct ggml_tensor * src1 = t->src[1];
+
+    if (ask) {
+        return true; // Always retrieve data
+    }
+
+    char src1_str[128] = {0};
+    if (src1) {
+        snprintf(src1_str, sizeof(src1_str), "%s", src1->name);
+    }
+    // printf("%s, %24s, %s, %10s, (%s, %s)", __func__,
+    //        t->name, ggml_type_name(t->type), ggml_op_desc(t),
+    //        src0->name,
+    //        src1 ? src1_str : "");
+
+    if (!(cb_data->cur_node < cb_data->vec_len)){
+        nodes.push_back({t->name, ggml_op_desc(t), src0->name, src1 ? src1_str : "", ggml_type_name(t->type), cb_data->temp_runtime});
+        cb_data->vec_len++;
+    }
+    else{
+        nodes[cb_data->cur_node].runtime += cb_data->temp_runtime;
+    }
+    cb_data->cur_node++;
+    //    printf("%s: %24s = (%s) %10s(%s{%s}, %s}) = {%s}\n", __func__,
+    //        t->name, ggml_type_name(t->type), ggml_op_desc(t),
+    //        src0->name, ggml_ne_string(src0).c_str(),
+    //        src1 ? src1_str : "",
+    //        ggml_ne_string(t).c_str());
+
+
+
+    // copy the data from the GPU memory if needed
+    const bool is_host = ggml_backend_buffer_is_host(t->buffer);
+
+    // if (!is_host) {
+    //     auto n_bytes = ggml_nbytes(t);
+    //     cb_data->data.resize(n_bytes);
+    //     ggml_backend_tensor_get(t, cb_data->data.data(), 0, n_bytes);
+    // }
+
+    // if (!ggml_is_quantized(t->type)) {
+    //     uint8_t * data = is_host ? (uint8_t *) t->data : cb_data->data.data();
+    //     ggml_print_tensor(data, t->type, t->ne, t->nb, 3);
+    // }
+
+    return true;
+}
 
 static llama_context           ** g_ctx;
 static llama_model             ** g_model;
@@ -207,6 +272,10 @@ int main(int argc, char ** argv) {
 
     // load the model and apply lora adapter, if any
     LOG("%s: load the model and apply lora adapter, if any\n", __func__);
+    // callback_data cb_data;
+    // params.cb_eval = ggml_debug;
+    // params.cb_eval_user_data = &cb_data;
+    // params.warmup = false;
     llama_init_result llama_init = llama_init_from_gpt_params(params);
 
     model = llama_init.model;
@@ -992,6 +1061,8 @@ int main(int argc, char ** argv) {
 #ifndef LOG_DISABLE_LOGS
     LOG_TEE("Log end\n");
 #endif // LOG_DISABLE_LOGS
-
+    for (int i = 0; i < nodes.size(); i++){
+        printf("%s, %s, %s, %s, %s, %dus\n", nodes[i].name.c_str(), nodes[i].op.c_str(), nodes[i].t1.c_str(), nodes[i].t2.c_str(), nodes[i].type.c_str(), nodes[i].runtime);
+    }
     return 0;
 }

@@ -1756,11 +1756,13 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
 
 static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     struct ggml_backend_sched_split * splits = sched->splits;
-    if (sched->callback_eval){
-    printf("New Round\n");
-    }
+    // if (sched->callback_eval){
+    // printf("New Round\n");
+    // }
     int *ptr = (int *)sched->callback_eval_user_data;//{int cur_node = 0,int vec_len,int temp_runtime}
-    ptr[0]=0;
+    if (sched->callback_eval){
+        ptr[0]=0;
+    }
     for (int i = 0; i < sched->n_splits; i++) {
         struct ggml_backend_sched_split * split = &splits[i];
         int split_backend_id = split->backend_id;
