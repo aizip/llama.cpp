@@ -219,8 +219,10 @@ int main(int argc, char ** argv) {
     }
 
     /*****/ 
+    // std::string basepath = "/home/matthew/z_llama_cpp_output_files/test_ambiguous_prompts/";
     std::string basepath = "/home/matthew/z_llama_cpp_output_files/test_main_prompts/";
-    for (int fidx = 1; fidx <= 3; fidx++) {
+    // for (int fidx = 1; fidx <= 1752; fidx++) {
+    for (int fidx = 1; fidx <= 2929; fidx++) {
     
     fprintf(stdout, "\n-----ITER %d-----\n", fidx);
     std::stringstream ss;
