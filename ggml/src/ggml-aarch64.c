@@ -1168,7 +1168,7 @@ void ggml_gemm_q4_0_4x4_q8_0(int n, float * restrict s, size_t bs, const void * 
 
 #if ! ((defined(_MSC_VER)) && ! defined(__clang__)) && defined(__aarch64__) && defined(__ARM_NEON)
     if (ggml_cpu_has_neon()) {
-#define UNROLL_FACTOR 2
+#define UNROLL_FACTOR 4
         int y = 0;
         for (; y + UNROLL_FACTOR <= nr / 4; y += UNROLL_FACTOR) {
             const block_q8_0x4 * a_ptr[UNROLL_FACTOR];
@@ -1187,48 +1187,44 @@ void ggml_gemm_q4_0_4x4_q8_0(int n, float * restrict s, size_t bs, const void * 
                 }
                 
                 for (int l = 0; l < nb; l++) {
-                    int32x4_t sumi[UNROLL_FACTOR][4];
-                    for (int z = 0; z < UNROLL_FACTOR; z++) {
-                        for (int m = 0; m < 4; m++) {
-                            sumi[z][m] = vdupq_n_s32(0);
-                        }
-                    }
+                    
 
+                    int8x16_t b_hi[4], b_lo[4];
                     for (int k = 0; k < 4; k++) {
-                        int8x16_t a0[UNROLL_FACTOR], a1[UNROLL_FACTOR];
-                        for (int z = 0; z < UNROLL_FACTOR; z++) {
-                            a0[z] = vld1q_s8(a_ptr[z][l].qs + 16 * k + 0);
-                            a1[z] = vld1q_s8(a_ptr[z][l].qs + 16 * k + 64);
-                        }
-
                         uint8x16_t b = vld1q_u8(b_ptr[l].qs + 16 * k);
-                        int8x16_t b_hi = vreinterpretq_s8_u8(b & 0xF0);
-                        int8x16_t b_lo = vreinterpretq_s8_u8(b << 4);
-
-                        for (int z = 0; z < UNROLL_FACTOR; z++) {
-                            sumi[z][0] = vdotq_laneq_s32(sumi[z][0], b_lo, a0[z], 0);
-                            sumi[z][1] = vdotq_laneq_s32(sumi[z][1], b_lo, a0[z], 1);
-                            sumi[z][2] = vdotq_laneq_s32(sumi[z][2], b_lo, a0[z], 2);
-                            sumi[z][3] = vdotq_laneq_s32(sumi[z][3], b_lo, a0[z], 3);
-                            sumi[z][0] = vdotq_laneq_s32(sumi[z][0], b_hi, a1[z], 0);
-                            sumi[z][1] = vdotq_laneq_s32(sumi[z][1], b_hi, a1[z], 1);
-                            sumi[z][2] = vdotq_laneq_s32(sumi[z][2], b_hi, a1[z], 2);
-                            sumi[z][3] = vdotq_laneq_s32(sumi[z][3], b_hi, a1[z], 3);
-                        }
+                        b_hi[k] = vreinterpretq_s8_u8(b & 0xF0);
+                        b_lo[k] = vreinterpretq_s8_u8(b << 4);
                     }
 
-                    float32x4_t a_d[UNROLL_FACTOR];
-                    for (int z = 0; z < UNROLL_FACTOR; z++) {
-                        a_d[z] = vcvt_f32_f16(vld1_f16((const float16_t *)a_ptr[z][l].d));
-                    }
                     float32x4_t b_d = vcvt_f32_f16(vld1_f16((const float16_t *)b_ptr[l].d));
 
                     for (int z = 0; z < UNROLL_FACTOR; z++) {
-                        sumf[z][0] = vmlaq_f32(sumf[z][0], vmulq_laneq_f32(b_d, a_d[z], 0), vcvtq_n_f32_s32(sumi[z][0], 4));
-                        sumf[z][1] = vmlaq_f32(sumf[z][1], vmulq_laneq_f32(b_d, a_d[z], 1), vcvtq_n_f32_s32(sumi[z][1], 4));
-                        sumf[z][2] = vmlaq_f32(sumf[z][2], vmulq_laneq_f32(b_d, a_d[z], 2), vcvtq_n_f32_s32(sumi[z][2], 4));
-                        sumf[z][3] = vmlaq_f32(sumf[z][3], vmulq_laneq_f32(b_d, a_d[z], 3), vcvtq_n_f32_s32(sumi[z][3], 4));
+                        int32x4_t sumi[4];
+                        for (int m = 0; m < 4; m++) {
+                            sumi[m] = vdupq_n_s32(0);
+                        }
+                        for (int k = 0; k < 4; k++) {
+                            int8x16_t a0 = vld1q_s8(a_ptr[z][l].qs + 16 * k + 0);
+                            sumi[0] = vdotq_laneq_s32(sumi[0], b_lo[k], a0, 0);
+                            sumi[1] = vdotq_laneq_s32(sumi[1], b_lo[k], a0, 1);
+                            sumi[2] = vdotq_laneq_s32(sumi[2], b_lo[k], a0, 2);
+                            sumi[3] = vdotq_laneq_s32(sumi[3], b_lo[k], a0, 3);                          
+                        }
+                        for (int k = 0; k < 4; k++) {
+                            int8x16_t a1 = vld1q_s8(a_ptr[z][l].qs + 16 * k + 64);
+                            sumi[0] = vdotq_laneq_s32(sumi[0], b_hi[k], a1, 0);
+                            sumi[1] = vdotq_laneq_s32(sumi[1], b_hi[k], a1, 1);
+                            sumi[2] = vdotq_laneq_s32(sumi[2], b_hi[k], a1, 2);
+                            sumi[3] = vdotq_laneq_s32(sumi[3], b_hi[k], a1, 3);
+                        }
+
+                        float32x4_t a_d = vcvt_f32_f16(vld1_f16((const float16_t *)a_ptr[z][l].d));
+                        sumf[z][0] = vmlaq_f32(sumf[z][0], vmulq_laneq_f32(b_d, a_d, 0), vcvtq_n_f32_s32(sumi[0], 4));
+                        sumf[z][1] = vmlaq_f32(sumf[z][1], vmulq_laneq_f32(b_d, a_d, 1), vcvtq_n_f32_s32(sumi[1], 4));
+                        sumf[z][2] = vmlaq_f32(sumf[z][2], vmulq_laneq_f32(b_d, a_d, 2), vcvtq_n_f32_s32(sumi[2], 4));
+                        sumf[z][3] = vmlaq_f32(sumf[z][3], vmulq_laneq_f32(b_d, a_d, 3), vcvtq_n_f32_s32(sumi[3], 4));
                     }
+
                 }
 
                 for (int z = 0; z < UNROLL_FACTOR; z++) {
