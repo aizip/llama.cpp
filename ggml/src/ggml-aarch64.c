@@ -1168,7 +1168,79 @@ void ggml_gemm_q4_0_4x4_q8_0(int n, float * restrict s, size_t bs, const void * 
 
 #if ! ((defined(_MSC_VER)) && ! defined(__clang__)) && defined(__aarch64__) && defined(__ARM_NEON)
     if (ggml_cpu_has_neon()) {
-        for (int y = 0; y < nr / 4; y++) {
+#define UNROLL_FACTOR 2
+        int y = 0;
+        for (; y + UNROLL_FACTOR <= nr / 4; y += UNROLL_FACTOR) {
+            const block_q8_0x4 * a_ptr[UNROLL_FACTOR];
+            for (int z = 0; z < UNROLL_FACTOR; z++) {
+                a_ptr[z] = (const block_q8_0x4 *) vy + ((y + z) * nb);
+            }
+
+            for (int x = 0; x < nc / ncols_interleaved; x++) {
+                const block_q4_0x4 * b_ptr = (const block_q4_0x4 *) vx + (x * nb);
+
+                float32x4_t sumf[UNROLL_FACTOR][4];
+                for (int z = 0; z < UNROLL_FACTOR; z ++) {
+                    for (int m = 0; m < 4; m++) {
+                        sumf[z][m] = vdupq_n_f32(0);
+                    }
+                }
+                
+                for (int l = 0; l < nb; l++) {
+                    int32x4_t sumi[UNROLL_FACTOR][4];
+                    for (int z = 0; z < UNROLL_FACTOR; z++) {
+                        for (int m = 0; m < 4; m++) {
+                            sumi[z][m] = vdupq_n_s32(0);
+                        }
+                    }
+
+                    for (int k = 0; k < 4; k++) {
+                        int8x16_t a0[UNROLL_FACTOR], a1[UNROLL_FACTOR];
+                        for (int z = 0; z < UNROLL_FACTOR; z++) {
+                            a0[z] = vld1q_s8(a_ptr[z][l].qs + 16 * k + 0);
+                            a1[z] = vld1q_s8(a_ptr[z][l].qs + 16 * k + 64);
+                        }
+
+                        uint8x16_t b = vld1q_u8(b_ptr[l].qs + 16 * k);
+                        int8x16_t b_hi = vreinterpretq_s8_u8(b & 0xF0);
+                        int8x16_t b_lo = vreinterpretq_s8_u8(b << 4);
+
+                        for (int z = 0; z < UNROLL_FACTOR; z++) {
+                            sumi[z][0] = vdotq_laneq_s32(sumi[z][0], b_lo, a0[z], 0);
+                            sumi[z][1] = vdotq_laneq_s32(sumi[z][1], b_lo, a0[z], 1);
+                            sumi[z][2] = vdotq_laneq_s32(sumi[z][2], b_lo, a0[z], 2);
+                            sumi[z][3] = vdotq_laneq_s32(sumi[z][3], b_lo, a0[z], 3);
+                            sumi[z][0] = vdotq_laneq_s32(sumi[z][0], b_hi, a1[z], 0);
+                            sumi[z][1] = vdotq_laneq_s32(sumi[z][1], b_hi, a1[z], 1);
+                            sumi[z][2] = vdotq_laneq_s32(sumi[z][2], b_hi, a1[z], 2);
+                            sumi[z][3] = vdotq_laneq_s32(sumi[z][3], b_hi, a1[z], 3);
+                        }
+                    }
+
+                    float32x4_t a_d[UNROLL_FACTOR];
+                    for (int z = 0; z < UNROLL_FACTOR; z++) {
+                        a_d[z] = vcvt_f32_f16(vld1_f16((const float16_t *)a_ptr[z][l].d));
+                    }
+                    float32x4_t b_d = vcvt_f32_f16(vld1_f16((const float16_t *)b_ptr[l].d));
+
+                    for (int z = 0; z < UNROLL_FACTOR; z++) {
+                        sumf[z][0] = vmlaq_f32(sumf[z][0], vmulq_laneq_f32(b_d, a_d[z], 0), vcvtq_n_f32_s32(sumi[z][0], 4));
+                        sumf[z][1] = vmlaq_f32(sumf[z][1], vmulq_laneq_f32(b_d, a_d[z], 1), vcvtq_n_f32_s32(sumi[z][1], 4));
+                        sumf[z][2] = vmlaq_f32(sumf[z][2], vmulq_laneq_f32(b_d, a_d[z], 2), vcvtq_n_f32_s32(sumi[z][2], 4));
+                        sumf[z][3] = vmlaq_f32(sumf[z][3], vmulq_laneq_f32(b_d, a_d[z], 3), vcvtq_n_f32_s32(sumi[z][3], 4));
+                    }
+                }
+
+                for (int z = 0; z < UNROLL_FACTOR; z++) {
+                    for (int m = 0; m < 4; m++) {
+                        vst1q_f32(s + ((y + z) * 4 + m) * bs + x * 4, sumf[z][m]);
+                    }
+                }
+            }
+        }
+#undef UNROLL_FACTOR
+
+        for (; y < nr / 4; y++) {
             const block_q8_0x4 * a_ptr = (const block_q8_0x4 *) vy + (y * nb);
             for (int x = 0; x < nc / ncols_interleaved; x++) {
                 const block_q4_0x4 * b_ptr = (const block_q4_0x4 *) vx + (x * nb);
