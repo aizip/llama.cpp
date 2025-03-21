@@ -2,16 +2,17 @@
 #include "llama.h"
 
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <vector>
 
-static void print_usage(int argc, char ** argv, const gpt_params & params) {
-    gpt_params_print_usage(argc, argv, params);
+static void print_usage(int, char ** argv) {
+    printf("\nexample usage:\n");
+    printf("\n    %s -m model.gguf [-n n_predict] [-ngl n_gpu_layers] [prompt]\n", argv[0]);
+    printf("\n");
 
-    LOG_TEE("\nexample usage:\n");
-    LOG_TEE("\n    %s -m model.gguf -p \"Hello my name is\" -n 32\n", argv[0]);
-    LOG_TEE("\n");
+
 }
 
 int main(int argc, char ** argv) {
@@ -86,7 +87,7 @@ int main(int argc, char ** argv) {
 
     llama_model_params model_params = llama_model_default_params();
 
-    llama_model * model = llama_load_model_from_file(params.model.c_str(), model_params);
+    llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
 
     if (model == NULL) {
         fprintf(stderr , "%s: error: unable to load model\n" , __func__);
@@ -160,8 +161,8 @@ int main(int argc, char ** argv) {
 
     // main loop
 
-    int n_cur    = batch.n_tokens;
-    int n_decode = 0;
+    // int n_cur    = batch.n_tokens;
+    // int n_decode = 0;
 
     const auto t_main_start = ggml_time_us();
 
@@ -223,8 +224,6 @@ int main(int argc, char ** argv) {
     fclose(f);
  
 
-    LOG_TEE("\n");
-
     const auto t_main_end = ggml_time_us();
 
     fprintf(stderr, "\n");
@@ -233,8 +232,9 @@ int main(int argc, char ** argv) {
     fprintf(stderr, "\n");
 
     // llama_sampler_free(smpl);
+
     llama_free(ctx);
-    llama_free_model(model);
+    llama_model_free(model);
 
     llama_backend_free();
 
