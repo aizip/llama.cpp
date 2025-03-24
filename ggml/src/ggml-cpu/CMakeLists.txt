@@ -34,8 +34,8 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
             message(STATUS "Accelerate framework found")
 
             target_compile_definitions(${GGML_CPU_NAME} PRIVATE GGML_USE_ACCELERATE)
-            target_compile_definitions(${GGML_CPU_NAME} PRIVATE ACCELERATE_NEW_LAPACK)
-            target_compile_definitions(${GGML_CPU_NAME} PRIVATE ACCELERATE_LAPACK_ILP64)
+            # target_compile_definitions(${GGML_CPU_NAME} PRIVATE ACCELERATE_NEW_LAPACK)
+            # target_compile_definitions(${GGML_CPU_NAME} PRIVATE ACCELERATE_LAPACK_ILP64)
 
             target_link_libraries(${GGML_CPU_NAME} PRIVATE ${ACCELERATE_FRAMEWORK})
         else()
