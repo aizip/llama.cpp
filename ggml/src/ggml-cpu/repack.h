@@ -238,6 +238,25 @@ void ggml_gemm_mxfp4_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs,
 void ggml_gemm_mxfp4_8x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc);
 void ggml_gemm_q8_0_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc);
 void ggml_gemm_q8_0_4x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc);
+// Q8_0 weights in the broadcast VNNI layout for x86 (AVX-VNNI, or AVX-512 VNNI + VL).
+// A weight panel is 8 rows x one Q8_0 block and has the size of block_q8_0x8 (d[8] + 256 bytes), but qs is
+// laid out as [8 groups of 4 k][8 rows][4 bytes] with every byte stored as q + 128 (unsigned), so one 256-bit
+// load is the u8 operand of vpdpbusd for 8 rows x 4 consecutive k. The activation side is plain block_q8_0
+// rows (quantize_row_q8_0) plus, per row, an aux array of {float d; int32 comp = -128 * sum(qs)} per block:
+// comp seeds the int32 accumulators and cancels the +128 offset, d is the row scale as float.
+#if defined(__AVXVNNI__) || (defined(__AVX512VNNI__) && defined(__AVX512VL__))
+#    define GGML_CPU_X86_VNNI 1
+void ggml_q8_0_vnni_comp(const void * GGML_RESTRICT q8_row, void * GGML_RESTRICT aux, int64_t k);
+// s[nr x nc] (row stride bs floats) = vy[nr rows of block_q8_0, k = n] x vx[nc rows packed in 8x4 panels]^T
+void ggml_gemm_q8_0_8x4_q8_0(int                        n,
+                             float * GGML_RESTRICT      s,
+                             size_t                     bs,
+                             const void * GGML_RESTRICT vx,
+                             const void * GGML_RESTRICT vy,
+                             const void * GGML_RESTRICT vy_aux,
+                             int                        nr,
+                             int                        nc);
+#endif
 #if defined __riscv_zvfh
 void ggml_quantize_mat_q8_0_4x1_generic(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k);
 void ggml_quantize_mat_q8_K_4x1_generic(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k);
